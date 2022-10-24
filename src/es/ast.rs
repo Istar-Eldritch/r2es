@@ -14,6 +14,7 @@ pub struct ESAsign<'s> {
     pub value: ESLiteral<'s>,
 }
 
+#[derive(Debug, PartialEq)]
 pub struct ESDeclare<'s> {
     pub location: Span<'s>,
     pub ident: &'s str,
@@ -50,6 +51,7 @@ pub struct ESFn<'s> {
     pub args: Vec<ESFnArg<'s>>,
 }
 
+#[derive(Debug, PartialEq, Clone)]
 pub enum ESType {
     Int,
     Float,
@@ -61,12 +63,15 @@ pub enum ESType {
     Typename,
 }
 
+#[derive(Debug, PartialEq)]
 pub struct ESString<'s> {
     pub location: Span<'s>,
     pub value: &'s str,
 }
 
+#[derive(Debug, PartialEq)]
 pub enum ESLiteral<'s> {
+    Bool(bool),
     Int(u64),
     Float(f64),
     String(ESString<'s>),
