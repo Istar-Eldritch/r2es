@@ -1,19 +1,18 @@
 use std::str::from_utf8;
 
 use nom::bytes::complete::{tag, take_until, take_while};
-use nom::character::{is_alphabetic, is_space, is_digit, is_alphanumeric};
+use nom::character::{is_alphabetic, is_alphanumeric, is_digit, is_space};
 use nom::IResult;
 use nom_locate::{position, LocatedSpan};
-use syn::token;
+use syn::{token, FnArg};
 
-use super::ast::{ESClass, ESClassAttributes, ESDeclare, ESFn, ESStatement, Item, Span, ESType, ESLiteral, ESString};
+use super::ast::{
+    ESClass, ESClassAttributes, ESDeclare, ESFn, ESFnArg, ESFnBody, ESLiteral, ESStatement,
+    ESString, ESType, Item, Span,
+};
 
 fn take_spaces(s: Span) -> IResult<Span, Span> {
     take_while(|c: char| c.is_ascii() && is_space(c as u8))(s)
-}
-
-fn parse_function(s: Span) -> IResult<Span, ESFn> {
-    unimplemented!()
 }
 
 fn parse_type(s: Span) -> IResult<Span, ESType> {
@@ -27,14 +26,19 @@ fn parse_type(s: Span) -> IResult<Span, ESType> {
         "typename" => Ok((s, ESType::Typename)),
         "vector" => Ok((s, ESType::Vector)),
         "void" => Ok((s, ESType::Void)),
-        _ => Err(nom::Err::Error(nom::error::Error::new(s, nom::error::ErrorKind::IsNot)))
-
+        _ => Err(nom::Err::Error(nom::error::Error::new(
+            s,
+            nom::error::ErrorKind::IsNot,
+        ))),
     }
 }
 
 fn parse_ident(s: Span) -> IResult<Span, Span> {
     if s.len() == 0 {
-        return Err(nom::Err::Error(nom::error::Error::new(s, nom::error::ErrorKind::Fail)))
+        return Err(nom::Err::Error(nom::error::Error::new(
+            s,
+            nom::error::ErrorKind::Fail,
+        )));
     }
     take_while(|c: char| c.is_ascii() && is_alphabetic(c as u8))(s)
 }
@@ -45,33 +49,47 @@ fn parse_bool(s: Span) -> IResult<Span, bool> {
     } else if let Ok((s, _)) = tag::<&str, Span, ()>("false")(s) {
         Ok((s, false))
     } else {
-        Err(nom::Err::Error(nom::error::Error::new(s, nom::error::ErrorKind::IsNot)))
+        Err(nom::Err::Error(nom::error::Error::new(
+            s,
+            nom::error::ErrorKind::IsNot,
+        )))
     }
 }
 
 fn parse_int(s: Span) -> IResult<Span, u64> {
     let (s, r) = take_while(|ch: char| ch.is_ascii() && is_digit(ch as u8))(s)?;
-    r.trim().parse::<u64>()
+    r.trim()
+        .parse::<u64>()
         .map(|v| ((s, v)))
         .map_err(|_| nom::Err::Error(nom::error::Error::new(s, nom::error::ErrorKind::IsNot)))
 }
 
 fn parse_float(s: Span) -> IResult<Span, f64> {
     let (s, r) = take_while(|ch: char| ch.is_ascii() && is_digit(ch as u8) || ch == '.')(s)?;
-    r.trim().parse::<f64>()
+    r.trim()
+        .parse::<f64>()
         .map(|v| ((s, v)))
         .map_err(|_| nom::Err::Error(nom::error::Error::new(s, nom::error::ErrorKind::IsNot)))
 }
 
 fn parse_str(s: Span) -> IResult<Span, ESString> {
     let (s, _) = tag("\"")(s)?;
-    let (s, r) = take_while(|ch: char| ch.is_ascii() && is_alphanumeric(ch as u8))(s)
-        .map(|(s, value)| (s, ESString {location: value, value: value.trim() }))?;
+    let (s, r) = take_while(|ch: char| ch.is_ascii() && is_alphanumeric(ch as u8))(s).map(
+        |(s, value)| {
+            (
+                s,
+                ESString {
+                    location: value,
+                    value: value.trim(),
+                },
+            )
+        },
+    )?;
     let (s, _) = tag("\"")(s)?;
     Ok((s, r))
 }
 
-fn parse_literal(typ: ESType, s: Span) ->  IResult<Span, ESLiteral> {
+fn parse_literal(typ: ESType, s: Span) -> IResult<Span, ESLiteral> {
     if let Ok((s, r)) = parse_bool(s) {
         Ok((s, ESLiteral::Bool(r)))
     } else if let Ok((s, r)) = parse_int(s) {
@@ -81,7 +99,10 @@ fn parse_literal(typ: ESType, s: Span) ->  IResult<Span, ESLiteral> {
     } else if let Ok((s, r)) = parse_float(s) {
         Ok((s, ESLiteral::Float(r)))
     } else {
-        Err(nom::Err::Error(nom::error::Error::new(s, nom::error::ErrorKind::IsNot)))
+        Err(nom::Err::Error(nom::error::Error::new(
+            s,
+            nom::error::ErrorKind::IsNot,
+        )))
     }
 }
 
@@ -101,7 +122,6 @@ fn parse_declaration(s: Span) -> IResult<Span, ESDeclare> {
 
     let (s, ident) = parse_ident(s)?;
 
-
     let mut value = None;
 
     let (s, _) = take_spaces(s)?;
@@ -110,18 +130,21 @@ fn parse_declaration(s: Span) -> IResult<Span, ESDeclare> {
         let (ss, _) = take_spaces(ss)?;
         let (ss, v) = parse_literal(typ.clone(), ss)?;
         s = ss;
-        value = Some(v); 
+        value = Some(v);
     }
 
     let (s, _) = tag(";")(s)?;
 
-    Ok((s, ESDeclare {
-        location,
-        ident: ident.trim(),
-        constant,
-        typ,
-        value
-    }))
+    Ok((
+        s,
+        ESDeclare {
+            location,
+            ident: ident.trim(),
+            constant,
+            typ,
+            value,
+        },
+    ))
 }
 
 fn parse_class_attributes(s: Span) -> IResult<Span, ESClassAttributes> {
@@ -132,6 +155,70 @@ fn parse_class_attributes(s: Span) -> IResult<Span, ESClassAttributes> {
         attributes.push(attribute);
     }
     Ok((s, attributes))
+}
+
+fn parse_function_arg(s: Span) -> IResult<Span, ESFnArg> {
+    let (location, _) = take_spaces(s)?;
+    let (location, typ) = parse_type(s)?;
+    let (s, _) = take_spaces(s)?;
+    let (s, ident) = parse_ident(s)?;
+    Ok((
+        s,
+        ESFnArg {
+            location,
+            ident: ident.trim(),
+            typ,
+            by_ref: false,
+            default: None,
+        },
+    ))
+}
+
+fn parse_function_body(s: Span) -> IResult<Span, ESFnBody> {
+    unimplemented!()
+}
+
+fn parse_function(s: Span) -> IResult<Span, ESFn> {
+    let (s, out_typ) = parse_type(s)?;
+    let location = s;
+    let (s, _) = take_spaces(s)?;
+    let (s, ident) = parse_ident(s)?;
+    let (s, _) = tag("(")(s)?;
+    let mut s = s;
+    let mut args: Vec<ESFnArg> = Vec::new();
+    let mut closing_tag: IResult<Span, Span>;
+    let mut first = true;
+    loop {
+        let (ss, _) = take_spaces(s)?;
+        s = ss;
+        closing_tag = tag(")")(s);
+        if let Ok((ss, _)) = closing_tag {
+            s = ss;
+            break;
+        } else {
+            if !first {
+                let (ss, _) = tag(",")(s)?;
+                let (ss, _) = take_spaces(ss)?;
+                s = ss;
+                first = false;
+            }
+            let (ss, arg) = parse_function_arg(s)?;
+            args.push(arg);
+            s = ss;
+        }
+    }
+    let (s, body) = parse_function_body(s)?;
+
+    Ok((
+        s,
+        ESFn {
+            location,
+            ident: ident.trim(),
+            out_typ,
+            args,
+            body,
+        },
+    ))
 }
 
 fn parse_class(s: Span) -> IResult<Span, ESClass> {
@@ -155,7 +242,6 @@ fn parse_class(s: Span) -> IResult<Span, ESClass> {
     ))
 }
 
-
 #[cfg(test)]
 mod tests {
 
@@ -173,13 +259,19 @@ mod tests {
         assert!(dec.is_err());
         s = LocatedSpan::from("abc");
         let dec = parse_ident(s);
-        assert_eq!(dec, Ok((unsafe {LocatedSpan::new_from_raw_offset(3, 1, "", ())}, s)));
+        assert_eq!(
+            dec,
+            Ok((unsafe { LocatedSpan::new_from_raw_offset(3, 1, "", ()) }, s))
+        );
         s = LocatedSpan::from("abc;");
         let dec = parse_ident(s);
-        assert_eq!(dec, Ok((
-            unsafe {LocatedSpan::new_from_raw_offset(3, 1, ";", ())},
-            unsafe {LocatedSpan::new_from_raw_offset(0, 1, "abc", ())}
-        )));
+        assert_eq!(
+            dec,
+            Ok((
+                unsafe { LocatedSpan::new_from_raw_offset(3, 1, ";", ()) },
+                unsafe { LocatedSpan::new_from_raw_offset(0, 1, "abc", ()) }
+            ))
+        );
     }
 
     #[test]
@@ -192,8 +284,15 @@ mod tests {
         assert_eq!(
             dec,
             Ok((
-                unsafe {LocatedSpan::new_from_raw_offset(6, 1, "", ())},
-                ESDeclare {location: s, ident: "a", constant: false, typ: ESType::Int, value: None }))
+                unsafe { LocatedSpan::new_from_raw_offset(6, 1, "", ()) },
+                ESDeclare {
+                    location: s,
+                    ident: "a",
+                    constant: false,
+                    typ: ESType::Int,
+                    value: None
+                }
+            ))
         );
 
         s = LocatedSpan::from("const int a;");
@@ -201,8 +300,15 @@ mod tests {
         assert_eq!(
             dec,
             Ok((
-                unsafe {LocatedSpan::new_from_raw_offset(12, 1, "", ())},
-                ESDeclare {location: s, ident: "a", constant: true, typ: ESType::Int, value: None }))
+                unsafe { LocatedSpan::new_from_raw_offset(12, 1, "", ()) },
+                ESDeclare {
+                    location: s,
+                    ident: "a",
+                    constant: true,
+                    typ: ESType::Int,
+                    value: None
+                }
+            ))
         );
 
         s = LocatedSpan::from("const int a = 1;");
@@ -210,8 +316,15 @@ mod tests {
         assert_eq!(
             dec,
             Ok((
-                unsafe {LocatedSpan::new_from_raw_offset(16, 1, "", ())},
-                ESDeclare {location: s, ident: "a", constant: true, typ: ESType::Int, value: Some(ESLiteral::Int(1)) }))
+                unsafe { LocatedSpan::new_from_raw_offset(16, 1, "", ()) },
+                ESDeclare {
+                    location: s,
+                    ident: "a",
+                    constant: true,
+                    typ: ESType::Int,
+                    value: Some(ESLiteral::Int(1))
+                }
+            ))
         );
     }
 }

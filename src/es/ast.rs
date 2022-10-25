@@ -44,11 +44,17 @@ pub struct ESFnArg<'s> {
     pub default: Option<ESLiteral<'s>>,
 }
 
+pub struct ESFnBody<'s> {
+    pub location: Span<'s>,
+    pub statements: Vec<ESStatement<'s>>,
+}
+
 pub struct ESFn<'s> {
     pub location: Span<'s>,
     pub ident: &'s str,
     pub out_typ: ESType,
     pub args: Vec<ESFnArg<'s>>,
+    pub body: ESFnBody<'s>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
