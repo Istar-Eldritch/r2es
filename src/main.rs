@@ -1,4 +1,4 @@
-mod es;
+pub mod es;
 use syn::{File, Item};
 
 fn main() -> Result<(), syn::Error> {

@@ -7,10 +7,10 @@ pub enum Item<'s> {
     Fn(),
 }
 
+#[derive(Debug, PartialEq)]
 pub struct ESAsign<'s> {
     pub location: Span<'s>,
     pub ident: &'s str,
-    pub typ: ESType,
     pub value: ESLiteral<'s>,
 }
 
@@ -23,9 +23,67 @@ pub struct ESDeclare<'s> {
     pub value: Option<ESLiteral<'s>>,
 }
 
-pub enum ESStatement<'s> {
-    Declare(ESDeclare<'s>),
-    Asign(ESAsign<'s>),
+pub enum ESOperandValue {
+    Add,
+    Substract,
+    Multiply,
+    Divide,
+    Lt,
+    Gt,
+    Lte,
+    Gte,
+    Eq,
+    Ne,
+    And,
+    Or
+}
+
+pub struct ESOperand<'a> {
+    pub location: Span<'a>,
+    pub value: ESOperandValue
+}
+
+pub struct ESBinOp<'a> {
+    pub location: Span<'a>,
+    pub left: ESExpression<'a>,
+    pub right: ESExpression<'a>,
+    pub op: ESOperand<'a>
+}
+
+pub enum ESPrefixOperandValue {
+    Negate
+}
+
+pub struct ESPrefixOperand<'a> {
+    pub location: Span<'a>,
+    pub value: ESPrefixOperandValue
+}
+
+pub struct ESPrefixOp<'a> {
+    pub location: Span<'a>,
+    pub value: ESExpression<'a>,
+    pub op: ESPrefixOperand<'a>
+}
+
+pub enum ESExpressionValue<'a> {
+    Assign(ESAsign<'a>),
+    Declare(ESDeclare<'a>),
+    BinOp(Box<ESBinOp<'a>>),
+    PrefixOp(Box<ESPrefixOp<'a>>)
+}
+
+pub struct ESExpression<'a> {
+    pub location: Span<'a>,
+    pub value: ESExpressionValue<'a>
+}
+
+pub enum ESStatementValue<'a> {
+    Expression(ESExpression<'a>)
+}
+
+pub struct ESStatement<'a> {
+    pub location: Span<'a>,
+    pub value: ESStatementValue<'a>
 }
 
 pub type ESClassAttributes<'s> = Vec<ESDeclare<'s>>;
