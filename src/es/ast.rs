@@ -10,7 +10,7 @@ pub enum Item{
 #[derive(Debug, PartialEq)]
 pub struct ESAsign {
     pub ident: String,
-    pub value: ESLiteral,
+    pub value: ESExpression,
 }
 
 #[derive(Debug, PartialEq)]
@@ -18,7 +18,7 @@ pub struct ESDeclare {
     pub ident: String,
     pub constant: bool,
     pub typ: ESType,
-    pub value: Option<ESLiteral>,
+    pub value: Option<ESExpression>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -99,13 +99,27 @@ pub enum ESExpression {
     Term(Box<ESTerm>),
     Cmp(Box<ESCmp>),
     Literal(ESLiteral),
-    Group(Box<ESGroup>)
+    Group(Box<ESGroup>),
+    Eq(Box<ESEq>),
 }
 
+#[derive(Debug, PartialEq)]
 pub enum ESStatement {
     Expression(ESExpression),
     Assign(ESAsign),
     Declare(ESDeclare),
+    If(Box<ESIf>),
+}
+
+#[derive(Debug, PartialEq)]
+pub struct ESIfBranch {
+    pub conditional: ESExpression,
+    pub body: ESBlock
+}
+
+#[derive(Debug, PartialEq)]
+pub struct ESIf {
+    pub branches: Vec<ESIfBranch>
 }
 
 pub type ESClassAttributes = Vec<ESDeclare>;
@@ -122,7 +136,8 @@ pub struct ESFnArg {
     pub default: Option<ESLiteral>,
 }
 
-pub struct ESFnBody {
+#[derive(Debug, PartialEq)]
+pub struct ESBlock {
     pub statements: Vec<ESStatement>,
 }
 
@@ -130,7 +145,7 @@ pub struct ESFn {
     pub ident: String,
     pub out_typ: ESType,
     pub args: Vec<ESFnArg>,
-    pub body: ESFnBody,
+    pub body: ESBlock,
 }
 
 #[derive(Debug, PartialEq, Clone)]
