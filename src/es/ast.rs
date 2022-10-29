@@ -2,117 +2,135 @@ use nom_locate::LocatedSpan;
 
 pub type Span<'a> = LocatedSpan<&'a str>;
 
-pub enum Item<'s> {
-    Class(ESClass<'s>),
+pub enum Item{
+    Class(ESClass),
     Fn(),
 }
 
 #[derive(Debug, PartialEq)]
-pub struct ESAsign<'s> {
-    pub location: Span<'s>,
-    pub ident: &'s str,
-    pub value: ESLiteral<'s>,
+pub struct ESAsign {
+    pub ident: String,
+    pub value: ESLiteral,
 }
 
 #[derive(Debug, PartialEq)]
-pub struct ESDeclare<'s> {
-    pub location: Span<'s>,
-    pub ident: &'s str,
+pub struct ESDeclare {
+    pub ident: String,
     pub constant: bool,
     pub typ: ESType,
-    pub value: Option<ESLiteral<'s>>,
+    pub value: Option<ESLiteral>,
 }
 
-pub enum ESOperandValue {
-    Add,
-    Substract,
+#[derive(Debug, PartialEq)]
+pub struct ESGroup {
+    pub inner: ESExpression
+}
+
+#[derive(Debug, PartialEq)]
+pub enum ESUnaryOp {
+    Negate,
+    LogicalNegate
+}
+
+#[derive(Debug, PartialEq)]
+pub struct ESUnary {
+    pub op: ESUnaryOp,
+    pub expr: ESExpression
+}
+
+#[derive(Debug, PartialEq)]
+pub enum ESFactorOp {
     Multiply,
-    Divide,
+    Divide
+}
+
+#[derive(Debug, PartialEq)]
+pub struct ESFactor {
+    pub op: ESFactorOp,
+    pub left: ESExpression,
+    pub right: ESExpression
+}
+
+#[derive(Debug, PartialEq)]
+pub enum ESTermOp {
+    Add,
+    Substract
+}
+
+#[derive(Debug, PartialEq)]
+pub struct ESTerm {
+    pub op: ESTermOp,
+    pub left: ESExpression,
+    pub right: ESExpression
+}
+
+#[derive(Debug, PartialEq)]
+pub enum ESEqOp {
+    Eq,
+    Ne
+}
+
+#[derive(Debug, PartialEq)]
+pub struct ESEq {
+    pub op: ESEqOp,
+    pub left: ESExpression,
+    pub right: ESExpression
+}
+
+#[derive(Debug, PartialEq)]
+pub enum ESCmpOp {
     Lt,
     Gt,
     Lte,
-    Gte,
-    Eq,
-    Ne,
-    And,
-    Or
+    Gte
 }
 
-pub struct ESOperand<'a> {
-    pub location: Span<'a>,
-    pub value: ESOperandValue
+#[derive(Debug, PartialEq)]
+pub struct ESCmp {
+    pub op: ESCmpOp,
+    pub left: ESExpression,
+    pub right: ESExpression
 }
 
-pub struct ESBinOp<'a> {
-    pub location: Span<'a>,
-    pub left: ESExpression<'a>,
-    pub right: ESExpression<'a>,
-    pub op: ESOperand<'a>
+#[derive(Debug, PartialEq)]
+pub enum ESExpression {
+    Unary(Box<ESUnary>),
+    Factor(Box<ESFactor>),
+    Term(Box<ESTerm>),
+    Cmp(Box<ESCmp>),
+    Literal(ESLiteral),
+    Group(Box<ESGroup>)
 }
 
-pub enum ESPrefixOperandValue {
-    Negate
+pub enum ESStatement {
+    Expression(ESExpression),
+    Assign(ESAsign),
+    Declare(ESDeclare),
 }
 
-pub struct ESPrefixOperand<'a> {
-    pub location: Span<'a>,
-    pub value: ESPrefixOperandValue
+pub type ESClassAttributes = Vec<ESDeclare>;
+
+pub struct ESClass {
+    pub ident: String,
+    pub attributes: ESClassAttributes,
 }
 
-pub struct ESPrefixOp<'a> {
-    pub location: Span<'a>,
-    pub value: ESExpression<'a>,
-    pub op: ESPrefixOperand<'a>
-}
-
-pub enum ESExpressionValue<'a> {
-    Assign(ESAsign<'a>),
-    Declare(ESDeclare<'a>),
-    BinOp(Box<ESBinOp<'a>>),
-    PrefixOp(Box<ESPrefixOp<'a>>)
-}
-
-pub struct ESExpression<'a> {
-    pub location: Span<'a>,
-    pub value: ESExpressionValue<'a>
-}
-
-pub enum ESStatementValue<'a> {
-    Expression(ESExpression<'a>)
-}
-
-pub struct ESStatement<'a> {
-    pub location: Span<'a>,
-    pub value: ESStatementValue<'a>
-}
-
-pub type ESClassAttributes<'s> = Vec<ESDeclare<'s>>;
-
-pub struct ESClass<'s> {
-    pub location: Span<'s>,
-    pub ident: &'s str,
-    pub attributes: ESClassAttributes<'s>,
-}
-
-pub struct ESFnArg<'s> {
-    pub location: Span<'s>,
-    pub ident: &'s str,
+pub struct ESFnArg {
+    pub ident: String,
     pub typ: ESType,
     pub by_ref: bool,
-    pub default: Option<ESLiteral<'s>>,
+    pub default: Option<ESLiteral>,
 }
 
-pub struct ESFnBody<'s> {
-    pub location: Span<'s>,
-    pub statements: Vec<ESStatement<'s>>,
+pub struct ESFnBody {
+    pub statements: Vec<ESStatement>,
 }
 
-pub struct ESFn<'s> {
-    pub location: Span<'s>,
-    pub ident: &'s str,
+pub struct ESFn {
+    pub ident: String,
     pub out_typ: ESType,
-    pub args: Vec<ESFnArg<'s>>,
-    pub body: ESFnBody<'s>,
+    pub args: Vec<ESFnArg>,
+    pub body: ESFnBody,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -128,15 +146,9 @@ pub enum ESType {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct ESString<'s> {
-    pub location: Span<'s>,
-    pub value: &'s str,
-}
-
-#[derive(Debug, PartialEq)]
-pub enum ESLiteral<'s> {
+pub enum ESLiteral {
     Bool(bool),
     Int(u64),
     Float(f64),
-    String(ESString<'s>),
+    String(String),
 }
