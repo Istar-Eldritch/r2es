@@ -117,19 +117,23 @@ fn parse_statement(s: Span) -> Result<(Span, ESStatement), ESError> {
         s = ss;
         Ok(ESStatement::If(Box::new(value)))
     } else if let Ok((ss, value)) = parse_declaration(s) {
+        let (ss, _) = take_spaces(ss)?;
+        let (ss, _) = tag::<_,_,()>(";")(ss).map_err(|_| ESError::InvalidInput(ss, ";"))?;
         s = ss;
         Ok(ESStatement::Declare(value))
     } else if let Ok((ss, value)) = parse_asignment(s) {
+        let (ss, _) = take_spaces(ss)?;
+        let (ss, _) = tag::<_,_,()>(";")(ss).map_err(|_| ESError::InvalidInput(ss, ";"))?;
         s = ss;
         Ok(ESStatement::Assign(value))
     } else if let Ok((ss, value)) = parse_expression(s) {
+        let (ss, _) = take_spaces(ss)?;
+        let (ss, _) = tag::<_,_,()>(";")(ss).map_err(|_| ESError::InvalidInput(ss, ";"))?;
         s = ss;
         Ok(ESStatement::Expression(value))
     } else {
         Err(ESError::InvalidInput(s, "Statemnt"))?
     };
-    let (s, _) = take_spaces(s)?;
-    let (s, _) = tag::<_,_,()>(";")(s).map_err(|_| ESError::InvalidInput(s, ";"))?;
     result.map(|r| (s, r))
 }
 
@@ -224,7 +228,11 @@ fn parse_if(s: Span) -> Result<(Span, ESIf), ESError> {
     let (s, _) = take_spaces(s)?;
     let (s, _) = tag::<_,_,()>("if")(s).map_err(|_| ESError::InvalidInput(s, "if"))?;
     let (s, _) =take_spaces(s)?;
+    let (s, _) = tag::<_,_,()>("(")(s).map_err(|_| ESError::InvalidInput(s, "("))?;
     let (s, conditional) = parse_expression(s)?;
+    let (s, _) = tag::<_,_,()>(")")(s).map_err(|_| ESError::InvalidInput(s, ")"))?;
+    let (s, _) =take_spaces(s)?;
+
     let (s, body) = parse_block(s)?;
     let mut s = s;
     let mut branches = vec![ESIfBranch { conditional, body }];
@@ -455,6 +463,31 @@ mod tests {
     }
 
     #[test]
+    fn parse_block_3() {
+        let s = LocatedSpan::from("{
+            if(true) {}
+        }");
+        let dec = parse_block(s);
+        assert_eq!(
+            dec,
+            Ok((
+                unsafe { LocatedSpan::new_from_raw_offset(35, 3, "", ()) },
+                ESBlock {
+                    statements: vec![
+                        ESStatement::If(Box::new(ESIf {branches: vec![
+                            ESIfBranch {
+                                body: ESBlock { statements: vec![] },
+                                conditional: ESExpression::Literal(ESLiteral::Bool(true))
+                            }
+                        ]}))
+                    
+                    ]
+                }
+            ))
+        );
+    }
+
+    #[test]
     fn parse_if_1() {
         let s = LocatedSpan::from("
             if(true) {
@@ -467,7 +500,7 @@ mod tests {
             Ok((
                 unsafe { LocatedSpan::new_from_raw_offset(37, 3, "", ())},
                 ESIf {
-                    branches: vec![ESIfBranch {body: ESBlock { statements: vec![] }, conditional: ESExpression::Group(Box::new(ESGroup { inner: ESExpression::Literal(ESLiteral::Bool(true)) }))}]
+                    branches: vec![ESIfBranch {body: ESBlock { statements: vec![] }, conditional: ESExpression::Literal(ESLiteral::Bool(true)) }]
                 }
             ))
         )
@@ -487,7 +520,7 @@ mod tests {
                 unsafe { LocatedSpan::new_from_raw_offset(45, 3, "", ())},
                 ESIf {
                     branches: vec![
-                        ESIfBranch {body: ESBlock { statements: vec![] }, conditional: ESExpression::Group(Box::new(ESGroup { inner: ESExpression::Literal(ESLiteral::Bool(true)) }))},
+                        ESIfBranch {body: ESBlock { statements: vec![] }, conditional: ESExpression::Literal(ESLiteral::Bool(true)) },
                         ESIfBranch {body: ESBlock { statements: vec![] }, conditional: ESExpression::Literal(ESLiteral::Bool(true)) }
                     ]
                 }
@@ -509,13 +542,28 @@ mod tests {
         assert_eq!(
             dec,
             Ok((
-                unsafe { LocatedSpan::new_from_raw_offset(45, 3, "", ())},
+                unsafe { LocatedSpan::new_from_raw_offset(91, 6, "", ())},
                 ESIf {
                     branches: vec![
-                        ESIfBranch {body: ESBlock { statements: vec![
-                            ESStatement::If(Box::new(ESIf{ branches: vec![ESIfBranch {body: ESBlock { statements: vec![] }, conditional: ESExpression::Group(Box::new(ESGroup { inner: ESExpression::Literal(ESLiteral::Bool(true)) }))}]}))
-                        ] }, conditional: ESExpression::Group(Box::new(ESGroup { inner: ESExpression::Literal(ESLiteral::Bool(true)) }))},
-                        ESIfBranch {body: ESBlock { statements: vec![] }, conditional: ESExpression::Literal(ESLiteral::Bool(true)) }
+                        ESIfBranch {
+                            body: ESBlock {
+                                statements: vec![
+                                    ESStatement::If(Box::new(ESIf{
+                                        branches: vec![
+                                            ESIfBranch {
+                                                body: ESBlock { statements: vec![] },
+                                                conditional: ESExpression::Literal(ESLiteral::Bool(true))
+                                            }
+                                        ]
+                                    }))
+                                ]
+                            },
+                            conditional: ESExpression::Literal(ESLiteral::Bool(true))
+                        },
+                        ESIfBranch {
+                            body: ESBlock { statements: vec![] },
+                            conditional: ESExpression::Literal(ESLiteral::Bool(true))
+                        }
                     ]
                 }
             ))
