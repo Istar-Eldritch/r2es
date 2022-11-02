@@ -100,7 +100,7 @@ pub enum ESExpression {
     Cmp(Box<ESCmp>),
     Literal(ESLiteral),
     Group(Box<ESGroup>),
-    Eq(Box<ESEq>),
+    Eq(Box<ESEq>)
 }
 
 #[derive(Debug, PartialEq)]
@@ -129,6 +129,7 @@ pub struct ESClass {
     pub attributes: ESClassAttributes,
 }
 
+#[derive(Debug, PartialEq)]
 pub struct ESFnArg {
     pub ident: String,
     pub typ: ESType,
@@ -141,6 +142,7 @@ pub struct ESBlock {
     pub statements: Vec<ESStatement>,
 }
 
+#[derive(Debug, PartialEq)]
 pub struct ESFn {
     pub ident: String,
     pub out_typ: ESType,
@@ -166,4 +168,5 @@ pub enum ESLiteral {
     Int(u64),
     Float(f64),
     String(String),
+    Ident(String),
 }

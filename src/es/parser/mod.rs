@@ -1,16 +1,16 @@
 mod expression;
 mod if_stat;
+mod function;
 
 use nom::bytes::complete::{tag, take_while};
 use nom::character::{is_alphabetic, is_alphanumeric, is_space, is_newline};
-use nom::{IResult};
 use nom_locate::{LocatedSpan};
 
 use self::expression::parse_expression;
 use self::if_stat::parse_if;
 
 use super::ast::{
-    ESClass, ESClassAttributes, ESDeclare, ESFn, ESFnArg, ESBlock, ESStatement,
+    ESClass, ESClassAttributes, ESDeclare, ESBlock, ESStatement,
     ESType, Span, ESAsign,
 };
 
@@ -40,11 +40,16 @@ fn parse_type(s: Span) -> Result<(Span, ESType), ESError> {
     }
 }
 
-fn parse_ident(s: Span) -> Result<(Span, Span), ESError> {
-    if s.len() == 0 {
-        return Err(ESError::EmptyInput(s));
+fn parse_ident(input: Span) -> Result<(Span, String), ESError> {
+    if input.len() == 0 {
+        return Err(ESError::EmptyInput(input));
     }
-    take_while::<_,_,()>(|c: char| c.is_ascii() && is_alphabetic(c as u8))(s).map_err(|_| ESError::Unexpected)
+    let (s, id) = take_while::<_,_,()>(|c: char| c.is_ascii() && is_alphabetic(c as u8))(input).map_err(|_| ESError::Unexpected)?;
+    if id.trim().len() == 0 {
+        Err(ESError::EmptyInput(input))
+    } else {
+        Ok((s, id.trim().into()))
+    }
 }
 
 fn parse_declaration(s: Span) -> Result<(Span, ESDeclare), ESError> {
@@ -80,22 +85,6 @@ fn parse_declaration(s: Span) -> Result<(Span, ESDeclare), ESError> {
             constant,
             typ,
             value,
-        },
-    ))
-}
-
-fn parse_function_arg(s: Span) -> Result<(Span, ESFnArg), ESError> {
-    let (location, _) = take_spaces(s)?;
-    let (location, typ) = parse_type(s)?;
-    let (s, _) = take_spaces(s)?;
-    let (s, ident) = parse_ident(s)?;
-    Ok((
-        s,
-        ESFnArg {
-            ident: String::from(ident.trim()),
-            typ,
-            by_ref: false,
-            default: None,
         },
     ))
 }
@@ -155,46 +144,7 @@ fn parse_block(s: Span) -> Result<(Span, ESBlock), ESError> {
     Ok((s, ESBlock {statements}))
 }
 
-fn parse_function(s: Span) -> Result<(Span, ESFn), ESError> {
-    let (s, out_typ) = parse_type(s)?;
-    let (s, _) = take_spaces(s)?;
-    let (s, ident) = parse_ident(s)?;
-    let (s, _) = tag::<_,_,()>("(")(s).map_err(|_| ESError::InvalidInput(s, "("))?;
-    let mut s = s;
-    let mut args: Vec<ESFnArg> = Vec::new();
-    let mut closing_tag: IResult<Span, Span>;
-    let mut first = true;
-    loop {
-        let (ss, _) = take_spaces(s)?;
-        s = ss;
-        closing_tag = tag(")")(s);
-        if let Ok((ss, _)) = closing_tag {
-            s = ss;
-            break;
-        } else {
-            if !first {
-                let (ss, _) = tag::<_,_,()>(",")(s).map_err(|_| ESError::InvalidInput(s, ","))?;
-                let (ss, _) = take_spaces(ss)?;
-                s = ss;
-                first = false;
-            }
-            let (ss, arg) = parse_function_arg(s)?;
-            args.push(arg);
-            s = ss;
-        }
-    }
-    let (s, body) = parse_block(s)?;
 
-    Ok((
-        s,
-        ESFn {
-            ident: String::from(ident.trim()),
-            out_typ,
-            args,
-            body,
-        },
-    ))
-}
 
 fn parse_class_attributes(s: Span) -> Result<(Span, ESClassAttributes), ESError> {
     let mut s: Span = s;
@@ -243,7 +193,7 @@ mod tests {
         let dec = parse_ident(s);
         assert_eq!(
             dec,
-            Ok((unsafe { LocatedSpan::new_from_raw_offset(3, 1, "", ()) }, s))
+            Ok((unsafe { LocatedSpan::new_from_raw_offset(3, 1, "", ()) }, "abc".into()))
         );
         s = LocatedSpan::from("abc;");
         let dec = parse_ident(s);
@@ -251,7 +201,7 @@ mod tests {
             dec,
             Ok((
                 unsafe { LocatedSpan::new_from_raw_offset(3, 1, ";", ()) },
-                unsafe { LocatedSpan::new_from_raw_offset(0, 1, "abc", ()) }
+                "abc".into()
             ))
         );
     }
