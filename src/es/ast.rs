@@ -93,6 +93,12 @@ pub struct ESCmp {
 }
 
 #[derive(Debug, PartialEq)]
+pub struct ESFnCall {
+    pub ident: String,
+    pub args: Vec<ESExpression>,
+}
+
+#[derive(Debug, PartialEq)]
 pub enum ESExpression {
     Unary(Box<ESUnary>),
     Factor(Box<ESFactor>),
@@ -100,7 +106,8 @@ pub enum ESExpression {
     Cmp(Box<ESCmp>),
     Literal(ESLiteral),
     Group(Box<ESGroup>),
-    Eq(Box<ESEq>)
+    Eq(Box<ESEq>),
+    FnCall(ESFnCall)
 }
 
 #[derive(Debug, PartialEq)]

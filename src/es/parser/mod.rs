@@ -44,7 +44,7 @@ fn parse_ident(input: Span) -> Result<(Span, String), ESError> {
     if input.len() == 0 {
         return Err(ESError::EmptyInput(input));
     }
-    let (s, id) = take_while::<_,_,()>(|c: char| c.is_ascii() && is_alphabetic(c as u8))(input).map_err(|_| ESError::Unexpected)?;
+    let (s, id) = take_while::<_,_,()>(|c: char| c.is_ascii() && is_alphanumeric(c as u8))(input).map_err(|_| ESError::Unexpected)?;
     if id.trim().len() == 0 {
         Err(ESError::EmptyInput(input))
     } else {
@@ -192,7 +192,7 @@ mod tests {
 
     use nom_locate::LocatedSpan;
 
-    use crate::es::{ast::{ESDeclare, ESLiteral, ESType, ESAsign, ESExpression, ESGroup, ESIfBranch, ESIf}};
+    use crate::es::{ast::{ESDeclare, ESLiteral, ESType, ESAsign, ESExpression, ESGroup, ESIfBranch, ESIf, ESFnCall}};
 
     use super::*;
 
@@ -416,6 +416,19 @@ mod tests {
                     
                     ]
                 }
+            ))
+        );
+    }
+
+    #[test]
+    fn parse_statement_0() {
+        let s = LocatedSpan::from("fn1();");
+        let dec = parse_statement(s);
+        assert_eq!(
+            dec,
+            Ok((
+                unsafe { LocatedSpan::new_from_raw_offset(6, 1, "", ()) },
+                ESStatement::Expression(ESExpression::FnCall(ESFnCall { ident: "fn1".into(), args: vec![]}))
             ))
         );
     }

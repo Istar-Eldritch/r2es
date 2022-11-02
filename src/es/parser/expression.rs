@@ -4,7 +4,7 @@ use nom::{bytes::{streaming::tag, complete::take_while}, character::{is_digit, i
 
 use crate::es::{ast::{Span, ESLiteral, ESExpression, ESUnaryOp, ESUnary, ESFactorOp, ESFactor, ESTermOp, ESTerm, ESCmpOp, ESCmp, ESEqOp, ESEq, ESGroup}, parser::take_spaces};
 
-use super::{ESError, parse_ident};
+use super::{ESError, parse_ident, function::parse_function_call};
 
 fn parse_bool(s: Span) -> Result<(Span, bool), ESError> {
     if let Ok((s, _)) = tag::<&str, Span, ()>("true")(s) {
@@ -65,7 +65,9 @@ fn parse_literal(s: Span) -> Result<(Span, ESLiteral), ESError> {
 }
 
 fn parse_literal_or_group(s: Span) -> Result<(Span, ESExpression), ESError> {
-        if let Ok((s, parsed)) = parse_literal(s) {
+    if let Ok((s, parsed)) = parse_function_call(s) {
+        Ok((s, parsed))
+    } else if let Ok((s, parsed)) = parse_literal(s) {
         Ok((s, ESExpression::Literal(parsed)))
     } else if let Ok((s, parsed)) = parse_group(s) {
         Ok((s, ESExpression::Group(Box::new(parsed))))

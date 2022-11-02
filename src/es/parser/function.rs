@@ -1,8 +1,8 @@
 use nom::bytes::complete::tag;
 
-use crate::es::ast::{Span, ESFnArg, ESFn};
+use crate::es::ast::{Span, ESFnArg, ESFn, ESExpression, ESFnCall};
 
-use super::{take_spaces, ESError, parse_type, parse_ident, parse_block};
+use super::{take_spaces, ESError, parse_type, parse_ident, parse_block, expression::parse_expression};
 
 fn parse_function_arg(s: Span) -> Result<(Span, ESFnArg), ESError> {
     let (s, _) = take_spaces(s)?;
@@ -60,6 +60,25 @@ pub fn parse_function_def(s: Span) -> Result<(Span, ESFn), ESError> {
             body,
         },
     ))
+}
+
+pub fn parse_function_call(s: Span) -> Result<(Span, ESExpression), ESError> {
+    let (s, _) = take_spaces(s)?;
+    let (s, ident) = parse_ident(s)?;
+    let (s, _) = tag::<_,_,()>("(")(s).map_err(|_| ESError::InvalidInput(s, "("))?;
+    let mut args = Vec::new();
+    let mut s = s;
+    while let Ok((ss, expr)) = parse_expression(s) {
+        args.push(expr);
+        let (ss, _) = take_spaces(ss)?;
+        s = ss;
+        if let Ok((ss, _)) = tag::<_,_,()>(",")(s) {
+            let (ss, _) = take_spaces(ss)?;
+            s = ss;
+        }
+    }
+    let (s, _) = tag::<_,_,()>(")")(s).map_err(|_| ESError::InvalidInput(s, ")"))?;
+    Ok((s, ESExpression::FnCall(ESFnCall { args, ident })))
 }
 
 #[cfg(test)]
@@ -155,6 +174,51 @@ mod tests {
                     },
                     out_typ: ESType::Void
                 }
+            ))
+        );
+    }
+
+    #[test]
+    fn parse_function_call_0() {
+        let s = LocatedSpan::from("test()");
+        let dec = parse_function_call(s);
+        assert_eq!(
+            dec,
+            Ok((
+                unsafe { LocatedSpan::new_from_raw_offset(6, 1, "", ()) },
+                ESExpression::FnCall(ESFnCall { ident: "test".into(), args: vec![] })
+            ))
+        );
+    }
+
+    #[test]
+    fn parse_function_call_1() {
+        let s = LocatedSpan::from("test(a, 1)");
+        let dec = parse_function_call(s);
+        assert_eq!(
+            dec,
+            Ok((
+                unsafe { LocatedSpan::new_from_raw_offset(10, 1, "", ()) },
+                ESExpression::FnCall(ESFnCall { ident: "test".into(), args: vec![
+                    ESExpression::Literal(ESLiteral::Ident("a".into())),
+                    ESExpression::Literal(ESLiteral::Int(1))
+                ] })
+            ))
+        );
+    }
+
+    #[test]
+    fn parse_function_call_2() {
+        let s = LocatedSpan::from("test1(test2(), test3())");
+        let dec = parse_function_call(s);
+        assert_eq!(
+            dec,
+            Ok((
+                unsafe { LocatedSpan::new_from_raw_offset(23, 1, "", ()) },
+                ESExpression::FnCall(ESFnCall { ident: "test1".into(), args: vec![
+                    ESExpression::FnCall(ESFnCall { ident: "test2".into(), args: vec![]}),
+                    ESExpression::FnCall(ESFnCall { ident: "test3".into(), args: vec![]}),
+                ] })
             ))
         );
     }
