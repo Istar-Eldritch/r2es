@@ -1,15 +1,17 @@
 mod expression;
+mod if_stat;
 
 use nom::bytes::complete::{tag, take_while};
 use nom::character::{is_alphabetic, is_alphanumeric, is_space, is_newline};
-use nom::{IResult, branch};
+use nom::{IResult};
 use nom_locate::{LocatedSpan};
 
 use self::expression::parse_expression;
+use self::if_stat::parse_if;
 
 use super::ast::{
     ESClass, ESClassAttributes, ESDeclare, ESFn, ESFnArg, ESBlock, ESStatement,
-    ESType, Span, ESAsign, ESIf, ESIfBranch,
+    ESType, Span, ESAsign,
 };
 
 #[derive(Debug, PartialEq)]
@@ -137,7 +139,7 @@ fn parse_statement(s: Span) -> Result<(Span, ESStatement), ESError> {
     result.map(|r| (s, r))
 }
 
-fn parse_block(mut s: Span) -> Result<(Span, ESBlock), ESError> {
+fn parse_block(s: Span) -> Result<(Span, ESBlock), ESError> {
     let (s, _) = take_spaces(s)?;
     let (s, _) = tag::<_,_,()>("{")(s).map_err(|_| ESError::InvalidInput(s, "{"))?;
     let (s, _) = take_spaces(s)?;
@@ -155,7 +157,6 @@ fn parse_block(mut s: Span) -> Result<(Span, ESBlock), ESError> {
 
 fn parse_function(s: Span) -> Result<(Span, ESFn), ESError> {
     let (s, out_typ) = parse_type(s)?;
-    let location = s;
     let (s, _) = take_spaces(s)?;
     let (s, ident) = parse_ident(s)?;
     let (s, _) = tag::<_,_,()>("(")(s).map_err(|_| ESError::InvalidInput(s, "("))?;
@@ -224,42 +225,12 @@ fn parse_class(s: Span) -> Result<(Span, ESClass), ESError> {
     ))
 }
 
-fn parse_if(s: Span) -> Result<(Span, ESIf), ESError> {
-    let (s, _) = take_spaces(s)?;
-    let (s, _) = tag::<_,_,()>("if")(s).map_err(|_| ESError::InvalidInput(s, "if"))?;
-    let (s, _) =take_spaces(s)?;
-    let (s, _) = tag::<_,_,()>("(")(s).map_err(|_| ESError::InvalidInput(s, "("))?;
-    let (s, conditional) = parse_expression(s)?;
-    let (s, _) = tag::<_,_,()>(")")(s).map_err(|_| ESError::InvalidInput(s, ")"))?;
-    let (s, _) =take_spaces(s)?;
-
-    let (s, body) = parse_block(s)?;
-    let mut s = s;
-    let mut branches = vec![ESIfBranch { conditional, body }];
-    while let Ok((ss, _)) = tag::<_,_, ()>("else if")(s) {
-        let (ss, conditional) =parse_expression(ss)?;
-        let (ss, body) = parse_block(ss)?;
-        s = ss;
-        branches.push(ESIfBranch { conditional, body });
-    }
-
-    (s, _) = take_spaces(s)?;
-
-    if let Ok((ss, _)) = tag::<_,_,()>("else")(s) {
-        let (ss, body) = parse_block(ss)?;
-        s = ss;
-        branches.push(ESIfBranch { conditional: super::ast::ESExpression::Literal(super::ast::ESLiteral::Bool(true)) , body })
-    }
-    
-    Ok((s, ESIf { branches }))
-}
-
 #[cfg(test)]
 mod tests {
 
     use nom_locate::LocatedSpan;
 
-    use crate::es::{ast::{ESDeclare, ESLiteral, ESType, ESAsign, ESExpression, ESGroup}};
+    use crate::es::{ast::{ESDeclare, ESLiteral, ESType, ESAsign, ESExpression, ESGroup, ESIfBranch, ESIf}};
 
     use super::*;
 
@@ -487,86 +458,4 @@ mod tests {
         );
     }
 
-    #[test]
-    fn parse_if_1() {
-        let s = LocatedSpan::from("
-            if(true) {
-            }");
-
-        let dec = parse_if(s);
-
-        assert_eq!(
-            dec,
-            Ok((
-                unsafe { LocatedSpan::new_from_raw_offset(37, 3, "", ())},
-                ESIf {
-                    branches: vec![ESIfBranch {body: ESBlock { statements: vec![] }, conditional: ESExpression::Literal(ESLiteral::Bool(true)) }]
-                }
-            ))
-        )
-    }
-
-    #[test]
-    fn parse_if_2() {
-        let s = LocatedSpan::from("
-            if(true) {
-            } else {}");
-
-        let dec = parse_if(s);
-
-        assert_eq!(
-            dec,
-            Ok((
-                unsafe { LocatedSpan::new_from_raw_offset(45, 3, "", ())},
-                ESIf {
-                    branches: vec![
-                        ESIfBranch {body: ESBlock { statements: vec![] }, conditional: ESExpression::Literal(ESLiteral::Bool(true)) },
-                        ESIfBranch {body: ESBlock { statements: vec![] }, conditional: ESExpression::Literal(ESLiteral::Bool(true)) }
-                    ]
-                }
-            ))
-        )
-    }
-
-    #[test]
-    fn parse_if_3() {
-        let s = LocatedSpan::from("
-            if(true) {
-                if(true) {
-
-                }
-            } else {}");
-
-        let dec = parse_if(s);
-
-        assert_eq!(
-            dec,
-            Ok((
-                unsafe { LocatedSpan::new_from_raw_offset(91, 6, "", ())},
-                ESIf {
-                    branches: vec![
-                        ESIfBranch {
-                            body: ESBlock {
-                                statements: vec![
-                                    ESStatement::If(Box::new(ESIf{
-                                        branches: vec![
-                                            ESIfBranch {
-                                                body: ESBlock { statements: vec![] },
-                                                conditional: ESExpression::Literal(ESLiteral::Bool(true))
-                                            }
-                                        ]
-                                    }))
-                                ]
-                            },
-                            conditional: ESExpression::Literal(ESLiteral::Bool(true))
-                        },
-                        ESIfBranch {
-                            body: ESBlock { statements: vec![] },
-                            conditional: ESExpression::Literal(ESLiteral::Bool(true))
-                        }
-                    ]
-                }
-            ))
-        )
-    }
 }
