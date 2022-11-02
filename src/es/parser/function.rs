@@ -20,7 +20,7 @@ fn parse_function_arg(s: Span) -> Result<(Span, ESFnArg), ESError> {
     ))
 }
 
-pub fn parse_function(s: Span) -> Result<(Span, ESFn), ESError> {
+pub fn parse_function_def(s: Span) -> Result<(Span, ESFn), ESError> {
     let (s, _) = take_spaces(s)?;
     let (s, out_typ) = parse_type(s)?;
     let (s, _) = take_spaces(s)?;
@@ -73,9 +73,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn parse_function_0() {
+    fn parse_function_def_0() {
         let s = LocatedSpan::from("void Test() {}");
-        let dec = parse_function(s);
+        let dec = parse_function_def(s);
         assert_eq!(
             dec,
             Ok((
@@ -86,9 +86,9 @@ mod tests {
     }
 
     #[test]
-    fn parse_function_1() {
+    fn parse_function_def_1() {
         let s = LocatedSpan::from("void Test(int a, float b) {}");
-        let dec = parse_function(s);
+        let dec = parse_function_def(s);
         assert_eq!(
             dec,
             Ok((
@@ -107,12 +107,12 @@ mod tests {
 
 
     #[test]
-    fn parse_function_2() {
+    fn parse_function_def_2() {
         let s = LocatedSpan::from("
             void Test(int a, float b) {
                 int s = a;
             }");
-        let dec = parse_function(s);
+        let dec = parse_function_def(s);
         assert_eq!(
             dec,
             Ok((
@@ -125,6 +125,34 @@ mod tests {
                     body: ESBlock {statements: vec![
                         ESStatement::Declare(ESDeclare {constant: false, ident: "s".into(), typ: ESType::Int, value: Some(ESExpression::Literal(ESLiteral::Ident("a".into())))})
                     ]}, ident: "Test".into(),
+                    out_typ: ESType::Void
+                }
+            ))
+        );
+    }
+
+    #[test]
+    fn parse_function_def_3() {
+        let s = LocatedSpan::from("
+            void Test(int a, float b) {
+                return a;
+            }");
+        let dec = parse_function_def(s);
+        assert_eq!(
+            dec,
+            Ok((
+                unsafe { LocatedSpan::new_from_raw_offset(80, 4, "", ()) },
+                ESFn {
+                    ident: "Test".into(),
+                    args: vec![
+                        ESFnArg {by_ref: false, default: None, ident: "a".into(), typ: ESType::Int},
+                        ESFnArg {by_ref: false, default: None, ident: "b".into(), typ: ESType::Float},  
+                    ],
+                    body: ESBlock {
+                        statements: vec![
+                            ESStatement::Return(ESExpression::Literal(ESLiteral::Ident("a".into())))
+                        ]
+                    },
                     out_typ: ESType::Void
                 }
             ))

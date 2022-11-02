@@ -100,6 +100,15 @@ fn parse_asignment(s: Span) -> Result<(Span, ESAsign), ESError> {
     Ok((s, ESAsign {ident: String::from(ident.trim()), value}))
 }
 
+fn parse_return_statement(s: Span) -> Result<(Span, ESStatement), ESError> {
+    let (s, _) = take_spaces(s)?;
+    let (s, _) = tag::<_,_,()>("return")(s).map_err(|_| ESError::InvalidInput(s, "return"))?;
+    let (s, expr) = parse_expression(s)?;
+    let (s, _) = take_spaces(s)?;
+    let (s, _) = tag::<_,_,()>(";")(s).map_err(|_| ESError::InvalidInput(s, ";"))?;
+    Ok((s, ESStatement::Return(expr))) 
+}
+
 fn parse_statement(s: Span) -> Result<(Span, ESStatement), ESError> {
     let (s, _) = take_spaces(s)?;
     let mut s = s;
@@ -117,6 +126,9 @@ fn parse_statement(s: Span) -> Result<(Span, ESStatement), ESError> {
         let (ss, _) = tag::<_,_,()>(";")(ss).map_err(|_| ESError::InvalidInput(ss, ";"))?;
         s = ss;
         Ok(ESStatement::Assign(value))
+    } else if let Ok((ss, value)) = parse_return_statement(s) {
+        s = ss;
+        Ok(value)
     } else if let Ok((ss, value)) = parse_expression(s) {
         let (ss, _) = take_spaces(ss)?;
         let (ss, _) = tag::<_,_,()>(";")(ss).map_err(|_| ESError::InvalidInput(ss, ";"))?;

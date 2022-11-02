@@ -109,6 +109,7 @@ pub enum ESStatement {
     Assign(ESAsign),
     Declare(ESDeclare),
     If(Box<ESIf>),
+    Return(ESExpression),
 }
 
 #[derive(Debug, PartialEq)]
