@@ -2,7 +2,7 @@ use std::cell::RefCell;
 
 use nom::{bytes::{streaming::tag, complete::take_while}, character::{is_digit, is_alphanumeric}};
 
-use crate::es::{ast::{Span, ESLiteral, ESExpression, ESUnaryOp, ESUnary, ESFactorOp, ESFactor, ESTermOp, ESTerm, ESCmpOp, ESCmp, ESEqOp, ESEq, ESGroup}, parser::take_spaces};
+use crate::es::{ast::{Span, ESLiteral, ESExpression, ESUnaryOp, ESUnary, ESFactorOp, ESFactor, ESTermOp, ESTerm, ESCmpOp, ESCmp, ESEqOp, ESEq, ESGroup, ESAddSufix}, parser::take_spaces};
 
 use super::{ESError, parse_ident, function::parse_function_call};
 
@@ -67,6 +67,8 @@ fn parse_literal(s: Span) -> Result<(Span, ESLiteral), ESError> {
 fn parse_literal_or_group(s: Span) -> Result<(Span, ESExpression), ESError> {
     if let Ok((s, parsed)) = parse_function_call(s) {
         Ok((s, parsed))
+    } else if let Ok((s, parsed)) = parse_sufix(s) {
+        Ok((s, parsed))
     } else if let Ok((s, parsed)) = parse_literal(s) {
         Ok((s, ESExpression::Literal(parsed)))
     } else if let Ok((s, parsed)) = parse_group(s) {
@@ -86,6 +88,12 @@ fn parse_unary(s: Span) -> Result<(Span, ESExpression), ESError> {
 
     let (s, expr) = parse_literal_or_group(ss)?;
     Ok((s, ESExpression::Unary(Box::new(ESUnary { op, expr }))))
+}
+
+fn parse_sufix(s: Span) -> Result<(Span, ESExpression), ESError> {
+    let (s, ident) = parse_ident(s)?;
+    let (s, _) = tag::<_,_,()>("++")(s).map_err(|_| ESError::InvalidInput(s, "++"))?;
+    Ok((s, ESExpression::Suffix(ESAddSufix { ident })))
 }
 
 fn parse_factor(s: Span) -> Result<(Span, ESExpression), ESError> {
@@ -435,7 +443,20 @@ mod tests {
     }
 
     #[test]
-    fn parses_expressions() {
+    fn parses_expression_0() {
+        let s = LocatedSpan::from("a++");
+        let dec = parse_expression(s);
+        assert_eq!(
+            dec,
+            Ok((
+                unsafe { LocatedSpan::new_from_raw_offset(3, 1, "", ()) },
+                ESExpression::Suffix(ESAddSufix { ident: "a".into() })
+            ))
+        ); 
+    }
+
+
+    fn parses_expression_1() {
         let s = LocatedSpan::from("(2 + 3) * 5");
         let dec = parse_expression(s);
         assert_eq!(

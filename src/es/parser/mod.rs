@@ -2,6 +2,7 @@ mod expression;
 mod if_stat;
 mod function;
 mod class;
+mod loops;
 
 use nom::bytes::complete::{tag, take_while};
 use nom::character::{is_alphanumeric, is_space, is_newline};

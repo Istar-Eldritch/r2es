@@ -99,7 +99,13 @@ pub struct ESFnCall {
 }
 
 #[derive(Debug, PartialEq)]
+pub struct ESAddSufix {
+    pub ident: String
+}
+
+#[derive(Debug, PartialEq)]
 pub enum ESExpression {
+    Suffix(ESAddSufix),
     Unary(Box<ESUnary>),
     Factor(Box<ESFactor>),
     Term(Box<ESTerm>),
@@ -111,13 +117,22 @@ pub enum ESExpression {
 }
 
 #[derive(Debug, PartialEq)]
+pub struct ESFor {
+    pub initexpr: ESStatement,
+    pub condition: ESStatement,
+    pub endexpr: ESExpression,
+    pub body: ESBlock
+}
+
+#[derive(Debug, PartialEq)]
 pub enum ESStatement {
     Expression(ESExpression),
     Assign(ESAsign),
     Declare(ESDeclare),
     If(Box<ESIf>),
     Return(ESExpression),
-    Comment(String)
+    Comment(String),
+    For(Box<ESFor>)
 }
 
 #[derive(Debug, PartialEq)]
