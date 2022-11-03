@@ -117,6 +117,7 @@ pub enum ESStatement {
     Declare(ESDeclare),
     If(Box<ESIf>),
     Return(ESExpression),
+    Comment(String)
 }
 
 #[derive(Debug, PartialEq)]

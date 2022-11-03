@@ -4,17 +4,13 @@ mod function;
 mod class;
 
 use nom::bytes::complete::{tag, take_while};
-use nom::character::{is_alphabetic, is_alphanumeric, is_space, is_newline};
-use nom_locate::{LocatedSpan};
+use nom::character::{is_alphanumeric, is_space, is_newline};
+use nom_locate::LocatedSpan;
 
 use self::expression::parse_expression;
-use self::function::parse_function_def;
 use self::if_stat::parse_if;
 
-use super::ast::{
-    ESClass, ESClassAttributes, ESDeclare, ESBlock, ESStatement,
-    ESType, Span, ESAsign, ESFn,
-};
+use super::ast::*;
 
 #[derive(Debug, PartialEq)]
 pub enum ESError<'a> {
@@ -111,11 +107,21 @@ fn parse_return_statement(s: Span) -> Result<(Span, ESStatement), ESError> {
     Ok((s, ESStatement::Return(expr))) 
 }
 
+fn parse_comment(s: Span) -> Result<(Span, ESStatement), ESError> {
+    let (s, _) = take_spaces(s)?;
+    let (s, _) = tag::<_,_,()>("//")(s).map_err(|_| ESError::InvalidInput(s, "//"))?;
+    let (s, comment) = take_while::<_,_,()>(|c: char| c.is_ascii() && !is_newline(c as u8))(s).map_err(|_| ESError::InvalidInput(s, "Comment"))?;
+    Ok((s, ESStatement::Comment(comment.trim().into())))
+}
+
 fn parse_statement(s: Span) -> Result<(Span, ESStatement), ESError> {
     let (s, _) = take_spaces(s)?;
     let mut s = s;
     let result =
-    if let Ok((ss, value)) = parse_if(s) {
+    if let Ok((ss, value)) = parse_comment(s) {
+        s = ss;
+        Ok(value)
+    } else if let Ok((ss, value)) = parse_if(s) {
         s = ss;
         Ok(ESStatement::If(Box::new(value)))
     } else if let Ok((ss, value)) = parse_declaration(s) {
@@ -392,6 +398,24 @@ mod tests {
     }
 
     #[test]
+    fn parse_block_4() {
+        let s = LocatedSpan::from("{
+            int a = 1; // just a comment
+        }");
+        let dec = parse_block(s);
+        assert_eq!(
+            dec,
+            Ok((
+                unsafe { LocatedSpan::new_from_raw_offset(52, 3, "", ()) },
+                ESBlock {statements: vec![
+                    ESStatement::Declare(ESDeclare { ident: "a".into(), constant: false, typ: ESType::Int, value: Some(ESExpression::Literal(ESLiteral::Int(1))) }),
+                    ESStatement::Comment("just a comment".into())
+                ]}
+            ))
+        );
+    }
+
+    #[test]
     fn parse_statement_0() {
         let s = LocatedSpan::from("fn1();");
         let dec = parse_statement(s);
@@ -400,6 +424,19 @@ mod tests {
             Ok((
                 unsafe { LocatedSpan::new_from_raw_offset(6, 1, "", ()) },
                 ESStatement::Expression(ESExpression::FnCall(ESFnCall { ident: "fn1".into(), args: vec![]}))
+            ))
+        );
+    }
+
+    #[test]
+    fn parse_statement_1() {
+        let s = LocatedSpan::from("// just a comment");
+        let dec = parse_statement(s);
+        assert_eq!(
+            dec,
+            Ok((
+                unsafe { LocatedSpan::new_from_raw_offset(17, 1, "", ()) },
+                ESStatement::Comment("just a comment".into())
             ))
         );
     }
