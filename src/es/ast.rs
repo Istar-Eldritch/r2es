@@ -132,9 +132,11 @@ pub struct ESIf {
 
 pub type ESClassAttributes = Vec<ESDeclare>;
 
+#[derive(Debug, PartialEq)]
 pub struct ESClass {
     pub ident: String,
     pub attributes: ESClassAttributes,
+    pub methods: Vec<ESFn>
 }
 
 #[derive(Debug, PartialEq)]

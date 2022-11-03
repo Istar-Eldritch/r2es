@@ -1,17 +1,19 @@
 mod expression;
 mod if_stat;
 mod function;
+mod class;
 
 use nom::bytes::complete::{tag, take_while};
 use nom::character::{is_alphabetic, is_alphanumeric, is_space, is_newline};
 use nom_locate::{LocatedSpan};
 
 use self::expression::parse_expression;
+use self::function::parse_function_def;
 use self::if_stat::parse_if;
 
 use super::ast::{
     ESClass, ESClassAttributes, ESDeclare, ESBlock, ESStatement,
-    ESType, Span, ESAsign,
+    ESType, Span, ESAsign, ESFn,
 };
 
 #[derive(Debug, PartialEq)]
@@ -22,7 +24,7 @@ pub enum ESError<'a> {
 }
 
 fn take_spaces(s: Span) -> Result<(Span, Span), ESError> {
-    take_while::<_,_,()>(|c: char| c.is_ascii() && is_space(c as u8) || is_newline(c as u8))(s).map_err(|_| ESError::Unexpected)
+    take_while::<_,_,()>(|c: char| c.is_ascii() && (is_space(c as u8) || is_newline(c as u8)))(s).map_err(|_| ESError::Unexpected)
 }
 
 fn parse_type(s: Span) -> Result<(Span, ESType), ESError> {
@@ -154,37 +156,6 @@ fn parse_block(s: Span) -> Result<(Span, ESBlock), ESError> {
     let (s, _) = take_spaces(s)?;
     let (s, _) = tag::<_,_,()>("}")(s).map_err(|_| ESError::InvalidInput(s, "}"))?;
     Ok((s, ESBlock {statements}))
-}
-
-
-
-fn parse_class_attributes(s: Span) -> Result<(Span, ESClassAttributes), ESError> {
-    let mut s: Span = s;
-    let mut attributes: Vec<ESDeclare> = Vec::new();
-    while let Ok((ss, attribute)) = parse_declaration(s) {
-        s = ss;
-        attributes.push(attribute);
-    }
-    Ok((s, attributes))
-}
-
-fn parse_class(s: Span) -> Result<(Span, ESClass), ESError> {
-    let (s, _) = tag::<_,_,()>("class")(s).map_err(|_| ESError::InvalidInput(s, "class"))?;
-    let (s, _) = take_spaces(s)?;
-    let (s, ident) = parse_ident(s)?;
-    let (s, _) = take_spaces(s)?;
-    let (s, _) = tag::<_,_,()>("{")(s).map_err(|_| ESError::InvalidInput(s, "{"))?;
-    let (s, attributes) = parse_class_attributes(s)?;
-    // TODO:  parse body
-    let (s, _) = tag::<_,_,()>("}")(s).map_err(|_| ESError::InvalidInput(s, "}"))?;
-
-    Ok((
-        s,
-        ESClass {
-            ident: String::from(ident.trim()),
-            attributes,
-        },
-    ))
 }
 
 #[cfg(test)]
